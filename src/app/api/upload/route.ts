@@ -149,7 +149,7 @@ function parseTournamentData(content: string): TournamentData[] {
         }
         
         // Look for winnings line
-        const winningsMatch = line.match(/received a total of \$([\d,]+)/);
+        const winningsMatch = line.match(/received a total of \$([\d,]+(?:\.\d+)?)/);
         if (winningsMatch) {
           winnings = Math.round(parseFloat(winningsMatch[1].replace(/,/g, '')) * 100) / 100;
         }
