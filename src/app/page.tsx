@@ -78,6 +78,7 @@ export default function Home() {
         setError(data.error || 'Error al procesar el archivo');
       }
     } catch (err) {
+      console.error(err);
       setError('Error de conexión');
     } finally {
       setLoading(false);
