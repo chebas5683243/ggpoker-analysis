@@ -120,10 +120,17 @@ function parseTournamentData(content: string): TournamentData[] {
       const tournamentName = headerMatch[2];
       
       // Parse buy-in
-      const buyInMatch = lines[1].match(/Buy-in: \$([\d.]+)\+\$([\d.]+)/);
+      const buyInMatch = lines[1].match(/Buy-in: (.+)/);
       if (!buyInMatch) continue;
       
-      const buyIn = Math.round((parseFloat(buyInMatch[1]) + parseFloat(buyInMatch[2])) * 100) / 100;
+      // Extract all dollar amounts from buy-in string
+      const buyInParts = buyInMatch[1].match(/\$([\d.]+)/g);
+      if (!buyInParts) continue;
+      
+      // Sum all parts
+      const buyIn = Math.round(buyInParts.reduce((sum, part) => {
+        return sum + parseFloat(part.replace('$', ''));
+      }, 0) * 100) / 100;
       
       // Parse total players
       const playersMatch = lines[2].match(/(\d+) Players/);
