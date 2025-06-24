@@ -1,103 +1,322 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+
+interface TournamentData {
+  tournamentId: string;
+  tournamentName: string;
+  buyIn: number;
+  reEntries: number;
+  totalBuyIn: number;
+  position: number;
+  totalPlayers: number;
+  topPercentage: number;
+  winnings: number;
+}
+
+interface ApiResponse {
+  success: boolean;
+  totalTournaments: number;
+  tournaments: TournamentData[];
+  summary: {
+    totalWinnings: number;
+    totalBuyIns: number;
+    netProfit: number;
+    tournamentsWithWinnings: number;
+    winRate: number;
+  };
+  buyInCategories: { [key: string]: { tournaments: TournamentData[], totalBuyIn: number, totalWinnings: number, count: number } };
+  error?: string;
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [file, setFile] = useState<File | null>(null);
+  const [tournaments, setTournaments] = useState<TournamentData[]>([]);
+  const [summary, setSummary] = useState<{ totalWinnings: number; totalBuyIns: number; netProfit: number; tournamentsWithWinnings: number; winRate: number } | null>(null);
+  const [buyInCategories, setBuyInCategories] = useState<{ [key: string]: { tournaments: TournamentData[], totalBuyIn: number, totalWinnings: number, count: number } }>({});
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.name.endsWith('.zip')) {
+        setFile(selectedFile);
+        setError(null);
+      } else {
+        setError('Por favor selecciona un archivo .zip');
+        setFile(null);
+      }
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      setError('Por favor selecciona un archivo');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data: ApiResponse = await response.json();
+
+      if (response.ok && data.success) {
+        setTournaments(data.tournaments);
+        setSummary(data.summary);
+        setBuyInCategories(data.buyInCategories);
+      } else {
+        setError(data.error || 'Error al procesar el archivo');
+      }
+    } catch (err) {
+      setError('Error de conexión');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2
+    }).format(amount);
+  };
+
+  const formatPercentage = (percentage: number) => {
+    return `${percentage.toFixed(2)}%`;
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 p-8">
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">
+            Análisis de Torneos de Poker
+          </h1>
+          <p className="text-lg text-gray-600">
+            Sube un archivo ZIP con datos de torneos y obtén estadísticas detalladas
+          </p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Seleccionar archivo ZIP con datos de torneos
+              </label>
+              <input
+                type="file"
+                accept=".zip"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+              />
+            </div>
+
+            {file && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-4">
+                <p className="text-green-800">
+                  <strong>Archivo seleccionado:</strong> {file.name}
+                </p>
+                <p className="text-green-600 text-sm">
+                  Tamaño: {(file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                <p className="text-red-800">{error}</p>
+              </div>
+            )}
+
+            <button
+              onClick={handleUpload}
+              disabled={!file || loading}
+              className="w-full bg-green-600 text-white py-3 px-6 rounded-md font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Procesando torneos...' : 'Analizar Torneos'}
+            </button>
+          </div>
+        </div>
+
+        {summary && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Resumen General</h2>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <div className="bg-blue-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-blue-800 mb-2">Total Buy-ins</h3>
+                <p className="text-3xl font-bold text-blue-600">{formatCurrency(summary.totalBuyIns)}</p>
+              </div>
+              <div className="bg-green-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-green-800 mb-2">Total Ganancias</h3>
+                <p className="text-3xl font-bold text-green-600">{formatCurrency(summary.totalWinnings)}</p>
+              </div>
+              <div className={`p-6 rounded-lg ${summary.netProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                <h3 className={`text-lg font-semibold mb-2 ${summary.netProfit >= 0 ? 'text-green-800' : 'text-red-800'}`}>
+                  Ganancia/Perdida
+                </h3>
+                <p className={`text-3xl font-bold ${summary.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(summary.netProfit)}
+                </p>
+              </div>
+              <div className="bg-purple-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-purple-800 mb-2">Torneos Ganados</h3>
+                <p className="text-3xl font-bold text-purple-600">{summary.tournamentsWithWinnings}</p>
+                <p className="text-sm text-purple-600">de {tournaments.length} total</p>
+              </div>
+              <div className="bg-orange-50 p-6 rounded-lg">
+                <h3 className="text-lg font-semibold text-orange-800 mb-2">% de Victoria</h3>
+                <p className="text-3xl font-bold text-orange-600">{summary.winRate.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {Object.keys(buyInCategories).length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Análisis por Categoría de Buy-in</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Buy-in
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Cantidad de Torneos
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Buy-ins
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Ganancias
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ganancia/Perdida
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Object.entries(buyInCategories).map(([buyIn, data]) => {
+                    const netProfit = data.totalWinnings - data.totalBuyIn;
+                    return (
+                      <tr key={buyIn} className="hover:bg-gray-50">
+                        <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {buyIn}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {data.count}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatCurrency(data.totalBuyIn)}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatCurrency(data.totalWinnings)}
+                        </td>
+                        <td className={`px-4 py-4 whitespace-nowrap text-sm font-medium ${
+                          netProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(netProfit)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {tournaments.length > 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-8">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">
+                Detalle de Torneos
+              </h2>
+              <p className="text-gray-600">
+                Total de torneos procesados: <strong>{tournaments.length}</strong>
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Tournament ID
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Nombre del Torneo
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Buy-in
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Re-entries
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Buy-in
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Puesto
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Top %
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Ganancias
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tournaments.map((tournament, index) => (
+                    <tr key={index} className={`hover:bg-gray-50 ${
+                      tournament.winnings > 0 ? 'bg-green-50' : 'bg-red-50'
+                    }`}>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        #{tournament.tournamentId}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">
+                        {tournament.tournamentName}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatCurrency(tournament.buyIn)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {tournament.reEntries}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatCurrency(tournament.totalBuyIn)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {tournament.position}º / {tournament.totalPlayers}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatPercentage(tournament.topPercentage)}
+                      </td>
+                      <td className={`px-4 py-4 whitespace-nowrap text-sm font-medium ${
+                        tournament.winnings > 0 ? 'text-green-600' : 'text-gray-500'
+                      }`}>
+                        {formatCurrency(tournament.winnings)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
